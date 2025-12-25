@@ -1,6 +1,9 @@
 import os
+import asyncio
 import logging
-from aiogram import Bot, Dispatcher, executor, types
+
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from supabase import create_client
 from dotenv import load_dotenv
 
@@ -10,31 +13,37 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
+logging.basicConfig(level=logging.INFO)
+
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-logging.basicConfig(level=logging.INFO)
 
-@dp.message_handler(commands=["start"])
+@dp.message(Command("start"))
 async def start_handler(message: types.Message):
     tg_id = message.from_user.id
     username = message.from_user.username
 
-    # пробуем создать пользователя
+    # создаём или обновляем пользователя
     supabase.table("users").upsert({
         "tg_id": tg_id,
         "username": username,
         "gip": 0
     }).execute()
 
-    kb = types.InlineKeyboardMarkup()
-    kb.add(
-        types.InlineKeyboardButton(
-            text="🛒 Открыть маркетплейс",
-            web_app=types.WebAppInfo(url="https://example.com")  # временно
-        )
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="🛒 Открыть маркетплейс",
+                    web_app=types.WebAppInfo(
+                        url="https://example.com"
+                    )
+                )
+            ]
+        ]
     )
 
     await message.answer(
@@ -48,5 +57,10 @@ async def start_handler(message: types.Message):
         parse_mode="Markdown"
     )
 
+
+async def main():
+    await dp.start_polling(bot)
+
+
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    asyncio.run(main())
